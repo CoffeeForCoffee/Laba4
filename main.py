@@ -1,11 +1,15 @@
 import telebot
-from telebot import types
+import requests
 
-# Чтоб никто не стащил >:(
+# ТГ токен
 with open("token", "r") as file:
     token = file.readline()
 
 bot = telebot.TeleBot(token)
+
+# API для курса валют
+with open("API_url", "r") as file:
+    API_URL = file.readline()
 
 @bot.message_handler(commands=['start'])
 def main(message):
@@ -21,27 +25,24 @@ def free(message):
         parse_mode="Markdown"
     )
 
-@bot.message_handler(commands=['convert'])
-def convert(message):
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('RUB', callback_data='convert_rub'))
-    markup.add(types.InlineKeyboardButton('EUR', callback_data='convert_eur'))
-    markup.add(types.InlineKeyboardButton('USD', callback_data='convert_usd'))
+@bot.message_handler(commands=['exchangerate'])
+def exchange_rate(message):
+    response = requests.get(API_URL)
+    data = response.json()
+    quotes = data["quotes"]
 
-    bot.send_message(
-        message.chat.id,
-        "Выберите валюту ИЗ которой переводить:",
-        reply_markup=markup
+    usd_to_eur = quotes.get("USDEUR", "N/A")
+    usd_to_rub = quotes.get("USDRUB", "N/A")
+    usd_to_aed = quotes.get("USDAED", "N/A")
+
+    message_text = (
+        "Курсы валют по отношению к 1 USD:\n\n"
+        f"1 USD = {usd_to_eur} EUR\n"
+        f"1 USD = {usd_to_rub} RUB\n"
+        f"1 USD = 60.61 Primogems\n"
+        f"1 USD = {usd_to_aed} AED"
     )
-@bot.callback_query_handler(func=lambda callback: True)
-def callback_message(callback):
-    if callback.data == 'convert_rub':
-        bot.send_message(callback.message.chat.id, "Вы выбрали RUB.")
-    elif callback.data == 'convert_eur':
-        bot.send_message(callback.message.chat.id, "Вы выбрали EUR.")
-    elif callback.data == 'convert_usd':
-        bot.send_message(callback.message.chat.id, "Вы выбрали USD.")
-    else:
-        bot.send_message(callback.message.chat.id, "Неизвестная валюта.")
+
+    bot.send_message(message.chat.id, message_text)
 
 bot.polling(none_stop=True)
